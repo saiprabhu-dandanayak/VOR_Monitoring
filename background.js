@@ -87,16 +87,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url && tab.url.includes('meet.google.com')) {
-    const meetingCodeMatch = tab.url.match(/meet\.google\.com\/([a-z0-9-]+)/i);
-    if (meetingCodeMatch && meetingCodeMatch[1].split('-').length === 3) {
-      chrome.storage.local.set({ meetUrl: tab.url });
-      console.log("Automatically detected and saved Meet URL:", tab.url);
-    }
-  }
-});
-
 async function findMeetTab() {
   const result = await chrome.storage.local.get(['meetUrl']);
   const meetUrl = result.meetUrl;
