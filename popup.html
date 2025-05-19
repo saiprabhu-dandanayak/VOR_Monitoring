@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Meet Screenshot Controller</title>
+    <style>
+      :root {
+        /* Updated color palette */
+        --primary-50: #e6f4ff;
+        --primary-100: #bde0fe;
+        --primary-200: #90cbfd;
+        --primary-300: #64b6fc;
+        --primary-400: #3da2fb;
+        --primary-500: #1a8cfa;
+        --primary-600: #0b6fd7;
+        --primary-700: #0954b5;
+        --primary-800: #094093;
+
+        /* Enhanced status colors */
+        --success-50: #e7f8f0;
+        --success-100: #cff1e2;
+        --success-500: #10b981;
+        --success-700: #047857;
+
+        --error-50: #fee2e2;
+        --error-100: #fecaca;
+        --error-500: #ef4444;
+        --error-700: #b91c1c;
+
+        --warning-50: #fffbeb;
+        --warning-100: #fef3c7;
+        --warning-500: #f59e0b;
+        --warning-700: #b45309;
+
+        /* Improved neutral colors */
+        --gray-50: #f9fafb;
+        --gray-100: #f3f4f6;
+        --gray-200: #e5e7eb;
+        --gray-300: #d1d5db;
+        --gray-400: #9ca3af;
+        --gray-500: #6b7280;
+        --gray-600: #4b5563;
+        --gray-700: #374151;
+        --gray-800: #1f2937;
+        --gray-900: #111827;
+
+        /* Enhanced shadows */
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+        --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08),
+          0 4px 6px rgba(0, 0, 0, 0.05);
+        --shadow-card: 0 2px 10px rgba(0, 0, 0, 0.05);
+
+        /* Border radius */
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+        --radius-full: 999px;
+
+        /* Transition */
+        --transition: 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        width: 380px;
+        font-family: "Google Sans", "Roboto", sans-serif;
+        color: var(--gray-900);
+        background-color: white;
+        line-height: 1.5;
+        position: relative;
+        margin-top: 12px;
+        margin-left: auto;
+        margin-right: 16px;
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12),
+          0 2px 8px rgba(0, 0, 0, 0.06);
+        border: 1px solid var(--gray-200);
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      body::before {
+        content: "";
+        position: absolute;
+        top: -8px;
+        right: 24px;
+        width: 0;
+        height: 0;
+        border-left: 8px solid transparent;
+        border-right: 8px solid transparent;
+        border-bottom: 8px solid var(--primary-600);
+        z-index: 10;
+      }
+
+      .header {
+        background: linear-gradient(
+          135deg,
+          var(--primary-500),
+          var(--primary-700)
+        );
+        color: white;
+        padding: 20px 24px;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .header::after,
+      .header::before {
+        content: "";
+        position: absolute;
+        border-radius: 50%;
+        opacity: 0.1;
+        animation: pulse 4s infinite ease-in-out;
+      }
+
+      .header::after {
+        top: -50px;
+        right: -50px;
+        width: 150px;
+        height: 150px;
+      }
+
+      .header::before {
+        bottom: -30px;
+        left: -30px;
+        width: 100px;
+        height: 100px;
+      }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 0.1;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 0.2;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 0.1;
+        }
+      }
+
+      .header h1 {
+        font-size: 20px;
+        font-weight: 500;
+        margin-bottom: 8px;
+        letter-spacing: 0.25px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .header p {
+        font-size: 14px;
+        opacity: 0.95;
+        font-weight: 400;
+        position: relative;
+        z-index: 1;
+      }
+
+      .content {
+        padding: 20px 24px;
+        background: linear-gradient(to bottom, white, var(--gray-50));
+      }
+
+      .card {
+        background-color: white;
+        border-radius: var(--radius-lg);
+        padding: 22px;
+        margin-bottom: 20px;
+        box-shadow: var(--shadow-card);
+        border: 1px solid var(--gray-100);
+        transition: transform var(--transition), box-shadow var(--transition);
+        position: relative;
+        overflow: hidden;
+        animation: slideUp 0.4s ease-out forwards;
+        opacity: 0;
+      }
+
+      @keyframes slideUp {
+        from {
+          transform: translateY(20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .card:nth-child(2) {
+        animation-delay: 0.1s;
+      }
+
+      .card:nth-child(3) {
+        animation-delay: 0.2s;
+      }
+
+      .card::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(
+          to right,
+          var(--primary-400),
+          var(--primary-600)
+        );
+        opacity: 0;
+        transition: opacity var(--transition);
+      }
+
+      .card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+      }
+
+      .card:hover::after {
+        opacity: 1;
+      }
+
+      .card-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+
+      .card-icon {
+        background: linear-gradient(
+          135deg,
+          var(--primary-400),
+          var(--primary-600)
+        );
+        width: 44px;
+        height: 44px;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 16px;
+        flex-shrink: 0;
+        box-shadow: 0 4px 6px rgba(10, 111, 215, 0.15);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .card-icon::after {
+        content: "";
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+        top: -10px;
+        right: -10px;
+      }
+
+      .card-icon svg {
+        fill: white;
+        width: 22px;
+        height: 22px;
+        position: relative;
+        z-index: 1;
+        animation: rotateIcon 4s linear infinite;
+      }
+
+      @keyframes rotateIcon {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .card-title {
+        font-weight: 500;
+        font-size: 17px;
+        color: var(--gray-800);
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--gray-700);
+      }
+
+      .form-hint {
+        font-size: 12px;
+        color: var(--gray-500);
+        margin-top: 6px;
+        line-height: 1.4;
+      }
+
+      input[type="text"],
+      input[type="time"],
+      input[type="url"] {
+        width: 100%;
+        padding: 12px 16px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        transition: all var(--transition);
+        color: var(--gray-800);
+        background-color: var(--gray-50);
+        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+      }
+
+      input[type="text"]:focus,
+      input[type="time"]:focus,
+      input[type="url"]:focus {
+        border-color: var(--primary-400);
+        outline: none;
+        box-shadow: 0 0 0 3px var(--primary-100);
+        background-color: white;
+      }
+
+      .btn {
+        background: linear-gradient(
+          to bottom,
+          var(--primary-500),
+          var(--primary-600)
+        );
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all var(--transition);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        box-shadow: 0 2px 4px rgba(26, 140, 250, 0.2);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .btn::after {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 50%;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.1),
+          transparent
+        );
+      }
+
+      .btn svg {
+        margin-right: 8px;
+        width: 18px;
+        height: 18px;
+        fill: white;
+      }
+
+      .btn:hover {
+        background: linear-gradient(
+          to bottom,
+          var(--primary-600),
+          var(--primary-700)
+        );
+        box-shadow: 0 4px 8px rgba(9, 84, 181, 0.25);
+        transform: translateY(-1px);
+      }
+
+      .btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 1px 2px rgba(9, 84, 181, 0.2);
+      }
+
+      .btn.secondary {
+        background: white;
+        color: var(--primary-600);
+        border: 1px solid var(--primary-200);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      }
+
+      .btn.secondary::after {
+        background: linear-gradient(to bottom, var(--primary-50), transparent);
+        opacity: 0.3;
+      }
+
+      .btn.secondary:hover {
+        background: var(--primary-50);
+        border-color: var(--primary-300);
+        box-shadow: 0 3px 6px rgba(9, 84, 181, 0.1);
+      }
+
+      .btn.secondary svg {
+        fill: var(--primary-600);
+      }
+
+      .btn-row {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .status {
+        margin-top: 20px;
+        padding: 14px 18px;
+        border-radius: var(--radius-md);
+        font-size: 14px;
+        display: none;
+        align-items: center;
+        line-height: 1.4;
+        border-left: 4px solid transparent;
+        animation: fadeInStatus 0.3s ease-out forwards;
+        opacity: 0;
+      }
+
+      @keyframes fadeInStatus {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      .status svg {
+        margin-right: 12px;
+        width: 20px;
+        height: 20px;
+        flex-shrink: 0;
+      }
+
+      .status.success {
+        background-color: var(--success-50);
+        color: var(--success-700);
+        border-left-color: var(--success-500);
+      }
+
+      .status.success svg {
+        fill: var(--success-500);
+      }
+
+      .status.error {
+        background-color: var(--error-50);
+        color: var(--error-700);
+        border-left-color: var(--error-500);
+      }
+
+      .status.error svg {
+        fill: var(--error-500);
+      }
+
+      .current-url-container {
+        margin-bottom: 20px;
+      }
+
+      .current-url-label {
+        font-weight: 500;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: var(--gray-700);
+      }
+
+      .current-url {
+        word-break: break-all;
+        font-size: 13px;
+        background-color: var(--gray-50);
+        padding: 12px 16px;
+        border-radius: var(--radius-md);
+        border: 1px solid var(--gray-200);
+        color: var(--gray-700);
+        font-family: "Roboto Mono", monospace;
+      }
+
+      .schedule-row {
+        display: flex;
+        gap: 12px;
+      }
+
+      .schedule-row input {
+        flex: 1;
+      }
+
+      .toggle-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+        padding: 8px 0;
+      }
+
+      .toggle-label {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--gray-700);
+      }
+
+      .toggle {
+        position: relative;
+        display: inline-block;
+        width: 52px;
+        height: 28px;
+      }
+
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--gray-300);
+        transition: var(--transition);
+        border-radius: var(--radius-full);
+      }
+
+      .slider:before {
+        position: absolute;
+        content: "";
+        height: 22px;
+        width: 22px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: var(--transition);
+        border-radius: 50%;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+      }
+
+      input:checked + .slider {
+        background: linear-gradient(
+          to right,
+          var(--primary-400),
+          var(--primary-600)
+        );
+      }
+
+      input:checked + .slider:before {
+        transform: translateX(24px);
+      }
+
+      .footer {
+        font-size: 12px;
+        color: var(--gray-500);
+        text-align: center;
+        padding: 16px 24px;
+        border-top: 1px solid var(--gray-200);
+        background-color: var(--gray-50);
+        background: linear-gradient(to bottom, var(--gray-50), var(--gray-100));
+        animation: fadeInFooter 0.4s ease-out forwards;
+        opacity: 0;
+      }
+
+      @keyframes fadeInFooter {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .divider {
+        height: 1px;
+        background-color: var(--gray-200);
+        margin: 16px 0;
+        opacity: 0.6;
+      }
+
+      .participants-container {
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: var(--radius-md);
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    margin-bottom: 16px;
+    padding: 8px 0;
+  }
+
+  .participants-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--gray-600);
+  }
+
+  #participant-stats {
+    font-weight: 500;
+  }
+
+  #last-updated {
+    font-size: 12px;
+    color: var(--gray-500);
+  }
+
+  .participant-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .participant-item:last-child {
+    border-bottom: none;
+  }
+
+  .participant-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gray-800);
+  }
+
+  .camera-status {
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .camera-icon {
+    width: 20px;
+    height: 20px;
+    margin-left: 8px;
+  }
+
+  .camera-on {
+    color: var(--success-500);
+  }
+
+  .camera-on svg {
+    fill: var(--success-500);
+  }
+
+  .camera-off {
+    color: var(--error-500);
+  }
+
+  .camera-off svg {
+    fill: var(--error-500);
+  }
+
+  .no-participants {
+    padding: 16px;
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 14px;
+  }
+
+  .status.info {
+    background-color: var(--primary-50);
+    color: var(--primary-700);
+    border-left-color: var(--primary-500);
+  }
+
+  .status.info svg {
+    fill: var(--primary-500);
+  }
+    </style>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500&family=Roboto+Mono&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="header">
+      <h1>Meet Screenshot Controller</h1>
+      <p>Automatically capture Google Meet screenshots with scheduling</p>
+    </div>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM14 13h-3v3H9v-3H6v-2h3V8h2v3h3v2z"
+              />
+            </svg>
+          </div>
+          <div class="card-title">Meeting Settings</div>
+        </div>
+
+        <div class="current-url-container">
+          <div class="current-url-label">Current Meeting URL</div>
+          <div class="current-url" id="current-url-display">
+            Loading meeting URL...
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="meetUrl">New Meeting URL</label>
+          <input
+            type="url"
+            id="meetUrl"
+            placeholder="https://meet.google.com/abc-defg-hij"
+          />
+          <div class="form-hint">
+            Enter the Google Meet URL you want to monitor for screenshots
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="updateBtn" class="btn">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"
+              />
+            </svg>
+            Update URL
+          </button>
+          <button id="captureNowBtn" class="btn secondary">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M9 3L7.17 5H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2h-3.17L15 3H9zm3 15c-2.76 0-5-2.0000000000000004-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"
+              />
+              <circle cx="12" cy="13" r="3" />
+            </svg>
+            Capture Now
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"
+              />
+              <path d="M12.5 7H11v6l5.25 3.15.75-1.23-4.5-2.67z" />
+            </svg>
+          </div>
+          <div class="card-title">Screenshot Schedule</div>
+        </div>
+
+        <div class="toggle-container">
+          <span class="toggle-label">Enable Time Restrictions</span>
+          <label class="toggle">
+            <input type="checkbox" id="enableTimeRestriction" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Pause Screenshots Between</label>
+          <div class="schedule-row">
+            <input type="time" id="startTime" value="13:00" />
+            <input type="time" id="endTime" value="15:00" />
+          </div>
+          <div class="form-hint">
+            Screenshots will be automatically paused during this time range
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="saveScheduleBtn" class="btn">
+            <svg viewBox="0 0 24 24">
+              <path
+                d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"
+              />
+            </svg>
+            Save Schedule
+          </button>
+        </div>
+      </div>
+
+      <div id="status" class="status">
+        <svg class="status-icon" viewBox="0 0 24 24">
+          <path
+            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"
+          />
+        </svg>
+        <span id="statusText"></span>
+      </div>
+    </div>
+
+    <div class="footer">
+      © 2025 Google Meet Screenshot Controller | Version 2.1.0
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
+
