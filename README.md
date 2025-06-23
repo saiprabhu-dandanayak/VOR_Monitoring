@@ -18,7 +18,7 @@ This Chrome extension helps automate the process of capturing attendance from Go
 
 2. Setup Google Apps Script
 
-- Go to Google Apps Script.
+- Go to [Google Apps Script](https://script.google.com/).
 - Create a new project.
 
 Replace the default content with the following script:
