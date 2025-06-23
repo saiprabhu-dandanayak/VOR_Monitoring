@@ -3,26 +3,29 @@ This Chrome extension helps automate the process of capturing attendance from Go
 
 ### 🚀 Features
 
-Capture participant metadata like timestamp, name, camera status, and breakout room name
-Log attendance in a structured format to Google Sheets
-Auto-create sheets based on date and breakout room
-Optional time restriction-based screenshot scheduling
+- Capture participant metadata like timestamp, name, camera status, and breakout room name
+- Log attendance in a structured format to Google Sheets
+- Auto-create sheets based on date and breakout room
+- Optional time restriction-based screenshot scheduling
+
 
 
 ### 🛠️ Setup Instructions
 1. Clone the Repository
-```bash
-git clone https://github.com/saiprabhu-dandanayak/VOR_Monitoring.git
-```
+
+`git clone https://github.com/saiprabhu-dandanayak/VOR_Monitoring.git`
+
 
 2. Setup Google Apps Script
 
-Go to Google Apps Script.
-Create a new project.
+- Go to Google Apps Script.
+- Create a new project.
+
 Replace the default content with the following script:
 
 
-```bash
+
+```
 function doPost(e) {
   try {
     console.log('--- Received POST Request ---');
@@ -157,47 +160,52 @@ function doPost(e) {
 }
 ```
 
+
+
 ### 3. Deploy as Web App
 
-Click Deploy > Manage deployments.
-Click + New Deployment.
-Under Select type, choose Web App.
-Fill in:
-Description: VOR Data Logger
-Execute As: Me
-Who has access: Anyone (or Anyone within Zemoso)
+- Click Deploy > Manage deployments.
+- Click + New Deployment.
+- Under Select type, choose Web App.
+- Fill in:
+- Description: VOR Data Logger
+- Execute As: Me
+- Who has access: Anyone (or Anyone within Zemoso)
+
 
 
 Click Deploy and copy the Web App URL.
 
 ### 4. Update the Extension with Script URL
 
-Open background.js in the cloned repo.
-Replace the scriptURL in updateCSV with your deployed Apps Script URL:
+- Open background.js in the cloned repo.
+- Replace the scriptURL in updateCSV with your deployed Apps Script URL:
+- const scriptURL = '<YOUR_SCRIPT_URL_HERE>';
 
-const scriptURL = '<YOUR_SCRIPT_URL_HERE>';
 
 ### 5. Load the Extension in Chrome
 
-Open chrome://extensions/.
-Enable Developer Mode.
-Click Load unpacked.
-Select the folder you cloned.
-Pin the extension from the extensions toolbar.
+- Open chrome://extensions/.
+- Enable Developer Mode.
+- Click Load unpacked.
+- Select the folder you cloned.
+- Pin the extension from the extensions toolbar.
+
 
 ### 6. Use the Extension
 
-Click the extension icon.
-Paste your Google Meet link in the Meet URL field.
-(Optional) Enable Time Restriction and set Start/End Time.
-Click Save Schedule.
-Click Capture Now to send data.
+- Click the extension icon.
+- Paste your Google Meet link in the Meet URL field.
+- (Optional) Enable Time Restriction and set Start/End Time.
+- Click Save Schedule.
+- Click Capture Now to send data.
+
 
 
 ### 🧪 Google Sheets Format
 For each breakout session and date, a sheet is created named:
-DD/MM/YYYY_BreakoutRoomName
+`DD/MM/YYYY_BreakoutRoomName`
 
 Each sheet has the following columns:
-Timestamp    Name    Camera_Status    Breakout_Room
+`Timestamp    Name    Camera_Status    Breakout_Room`
 
