@@ -14,13 +14,17 @@
   "host_permissions": [
     "https://meet.google.com/*",
     "<all_urls>",
-    "http://vor-monitoring.z-apps.io/*"
+    "http://vor-monitoring.z-apps.io/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_popup": "popup.html",
+    "default_title": "Meet Screenshot Monitor",
     "default_icon": {
       "16": "screenshot_camera.png",
       "48": "google_meet_icon.png",

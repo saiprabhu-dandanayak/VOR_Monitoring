@@ -1,3 +1,4 @@
+// Initialize default settings
 chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'], function(result) {
   const defaults = {};
   
@@ -22,20 +23,33 @@ chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'],
   }
 });
 
+// Create alarm for periodic screenshots
 chrome.alarms.create("takeScreenshot", { periodInMinutes: 1 });
 
+// Handle alarm events
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "takeScreenshot") {
     const isRestricted = await isTimeRestricted();
+    const now = new Date();
+    const currentHour = now.getHours();
+    const isAfterHardStopTime = currentHour >= 18;
     if (!isRestricted) {
       console.log("Taking scheduled screenshot");
       await takeScreenshot();
     } else {
-      console.log("Screenshot skipped due to time restrictions");
+      let reasons = [];
+      if (isRestricted) {
+        reasons.push("user-defined time restrictions");
+      }
+      if (isAfterHardStopTime) {
+        reasons.push("it's 6 PM or later (hard stop)");
+      }
+      console.log(`Screenshot skipped due to: ${reasons.join(' and ')}.`);
     }
   }
 });
 
+// Check if current time is within restricted period
 async function isTimeRestricted() {
   const result = await chrome.storage.local.get(['timeRestriction', 'startTime', 'endTime']);
   
@@ -65,6 +79,7 @@ async function isTimeRestricted() {
   }
 }
 
+// Handle messages from popup or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateMeetUrl") {
     chrome.storage.local.set({ meetUrl: message.url });
@@ -87,37 +102,26 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 });
 
+// Find the specific Google Meet tab based on stored meetUrl
 async function findMeetTab() {
   const result = await chrome.storage.local.get(['meetUrl']);
   const meetUrl = result.meetUrl;
-  
+
   if (meetUrl) {
     const exactTabs = await chrome.tabs.query({ url: meetUrl });
     if (exactTabs.length > 0) {
       console.log("Found exact Meet tab:", exactTabs[0].url);
       return exactTabs[0];
     }
-    
-    const urlWithoutParams = meetUrl.split('?')[0];
-    const flexibleTabs = await chrome.tabs.query({ url: urlWithoutParams + '*' });
-    if (flexibleTabs.length > 0) {
-      console.log("Found flexible Meet tab:", flexibleTabs[0].url);
-      return flexibleTabs[0];
-    }
   }
-  
-  const meetTabs = await chrome.tabs.query({ url: "https://meet.google.com/*" });
-  if (meetTabs.length > 0) {
-    chrome.storage.local.set({ meetUrl: meetTabs[0].url });
-    console.log("Found generic Meet tab and saved URL:", meetTabs[0].url);
-    return meetTabs[0];
-  }
-  
-  console.error("No Google Meet tab found.");
-  throw new Error("No Google Meet tab found.");
+
+  console.error("No matching Google Meet tab found for the stored URL.");
+  throw new Error("No matching Google Meet tab found.");
 }
 
+// Take a screenshot of the specific Meet tab
 async function takeScreenshot() {
+  let currentActiveTab = null;
   try {
     const { isProcessing } = await chrome.storage.local.get(['isProcessing']);
     if (isProcessing) {
@@ -127,40 +131,53 @@ async function takeScreenshot() {
 
     await chrome.storage.local.set({ isProcessing: true });
 
-    const meetTab = await findMeetTab();
-    if (!meetTab || !meetTab.windowId) {
-      console.error("Error: No valid Google Meet tab found.");
+    let meetTab;
+    try {
+      meetTab = await findMeetTab();
+    } catch (error) {
+      console.error("Failed to find Meet tab:", error.message);
       return;
     }
 
-    const [currentActiveTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!meetTab || !meetTab.windowId) {
+      console.error("Error: No valid Google Meet tab available.");
+      return;
+    }
+
+    [currentActiveTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     await chrome.windows.update(meetTab.windowId, { focused: true });
     await chrome.tabs.update(meetTab.id, { active: true });
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    chrome.tabs.captureVisibleTab(meetTab.windowId, { format: "png" }, (dataUrl) => {
+    chrome.tabs.captureVisibleTab(meetTab.windowId, { format: "png" }, async (dataUrl) => {
       if (chrome.runtime.lastError) {
         console.error("Error capturing tab:", chrome.runtime.lastError.message);
-        chrome.storage.local.set({ isProcessing: false });
         return;
       }
-      console.log("Screenshot captured successfully.");
-      saveImage(dataUrl).finally(() => {
-        chrome.storage.local.set({ isProcessing: false });
-      });
-    });
 
-    if (currentActiveTab) {
-      await chrome.tabs.update(currentActiveTab.id, { active: true });
-    }
+      console.log("Screenshot captured successfully.");
+      try {
+        await saveImage(dataUrl);
+      } catch (error) {
+        console.error("Error saving screenshot:", error);
+      } finally {
+        await chrome.storage.local.set({ isProcessing: false });
+      }
+
+      if (currentActiveTab) {
+        await chrome.tabs.update(currentActiveTab.id, { active: true });
+      }
+    });
   } catch (error) {
     console.error("Error in takeScreenshot:", error);
     await chrome.storage.local.set({ isProcessing: false });
   }
 }
 
+
+// Save screenshot and send to FastAPI endpoint
 async function saveImage(dataUrl) {
   const subfolder = "GoogleMeetScreenshots";
   const now = new Date();
@@ -212,17 +229,18 @@ async function saveImage(dataUrl) {
       throw new Error(`API request failed with status ${apiResponse.status}: ${apiResponse.statusText}`);
     }
 
-    let participants;
+    let data;
     try {
-      participants = await apiResponse.json();
-      console.log("Received participants data from FastAPI:", participants);
+      data = await apiResponse.json();
+      console.log("Received data from FastAPI:", data);
     } catch (jsonError) {
       console.error("Error parsing FastAPI JSON response:", jsonError);
-      participants = null;
+      data = null;
     }
 
-    if (participants !== null) {
-      await updateCsv(participants, `${dateStr}_${timeStr}`); 
+    if (data !== null) {
+      const formattedTimestamp = `${dateStr} ${timeStr.replace(/-/g, ':')}`;
+      await updateCsv(data, formattedTimestamp);
     } else {
       console.log("Skipping CSV update due to invalid FastAPI response.");
     }
@@ -232,80 +250,54 @@ async function saveImage(dataUrl) {
   }
 }
 
-async function updateCsv(participants, timestamp) {
-  const subfolder = "GoogleMeetScreenshots";
-  const [dateStr, timeStr] = timestamp.split('_'); 
-  const csvFilename = `${subfolder}/${dateStr}/participants_data.csv`; 
+// Update Google Sheets with participant data
+async function updateCsv(data, formattedTimestamp) {
+  const scriptUrl = 'https://script.google.com/a/macros/zemosolabs.com/s/AKfycbz3eHEYjoOx6bEJdZVyW47ROVYsh4OQlVb_c2Kme2LesZYyjlyqjnNsPiM9C1qDdmf3/exec';  
 
-  console.log("Updating CSV with participants:", participants);
+  const breakoutRoom = data.breakout_room || "Unknown"; 
+  const participantData = data.participants || null; 
 
-  const result = await chrome.storage.local.get(['csvContent']);
-  let csvContent = result.csvContent || "Timestamp,Name,Camera_Status\n";
-
-  if (Array.isArray(participants) && participants.length > 0) {
-    participants.forEach(participant => {
-      if (participant && typeof participant === 'object' && 'name' in participant && 'camera_status' in participant) {
-        const name = participant.name ? participant.name.replace(/"/g, '""') : '';
-        const cameraStatus = participant.camera_status && ['ON', 'OFF', 'UNKNOWN'].includes(participant.camera_status) ? participant.camera_status : '';
-        csvContent += `"${dateStr} ${timeStr.replace(/-/g, ':')}","${name}","${cameraStatus}"\n`;
-      } else {
-        console.warn("Invalid participant data, skipping:", participant);
-      }
-    });
-  } else {
-    console.log("No valid participants, skipping CSV update.");
-    return;
-  }
-
+  const dataToSend = participantData.map(participant => ({
+    timestamp: formattedTimestamp,
+    name: participant.name,
+    camera_status: participant.camera_status,
+    breakout_room: breakoutRoom
+  }));
+  
   try {
-    await chrome.storage.local.set({ csvContent });
-    console.log("CSV content saved to chrome.storage.local");
-  } catch (error) {
-    console.error("Error saving CSV content to storage:", error);
-    return;
-  }
-
-  const csvBase64 = btoa(csvContent);
-  const csvDataUrl = `data:text/csv;base64,${csvBase64}`;
-
-  let retryCount = 0;
-  const maxRetries = 3;
-
-  async function attemptDownload() {
-    return new Promise((resolve, reject) => {
-      chrome.downloads.download({
-        url: csvDataUrl,
-        filename: csvFilename,
-        saveAs: false,
-        conflictAction: "overwrite"
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          console.error(`❌ CSV download error (attempt ${retryCount + 1}):`, chrome.runtime.lastError);
-          reject(chrome.runtime.lastError);
-        } else {
-          console.log(`✅ CSV saved as ${csvFilename}`);
-          resolve();
-        }
-      });
+    const response = await fetch(scriptUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(dataToSend),
+      credentials: 'include'
     });
-  }
-
-  while (retryCount < maxRetries) {
-    try {
-      await attemptDownload();
-      break;
-    } catch (error) {
-      retryCount++;
-      if (retryCount === maxRetries) {
-        console.error(`Failed to download CSV after ${maxRetries} attempts`);
-        break;
-      }
-      console.log(`Retrying CSV download (attempt ${retryCount + 1})...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
+    
+    console.log('Data sent successfully to Google Sheets');
+  } catch (error) {
+    console.error('Error sending data to Google Sheets:', error);
   }
 }
 
+// Handle extension installation or update
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("🚀 Extension installed.");
+  console.log("🚀 Extension installed/updated.");
+
+  chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'], function(result) {
+    const defaults = {};
+    if (result.meetUrl === undefined) defaults.meetUrl = '';
+    if (result.timeRestriction === undefined) defaults.timeRestriction = false;
+    if (result.startTime === undefined) defaults.startTime = '13:00';
+    if (result.endTime === undefined) defaults.endTime = '15:00';
+    if (Object.keys(defaults).length > 0) {
+      chrome.storage.local.set(defaults, () => {
+        console.log("Default settings applied/verified.");
+      });
+    }
+  });
 });
