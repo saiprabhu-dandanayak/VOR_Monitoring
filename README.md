@@ -1,7 +1,7 @@
-VOR Monitoring Extension 
+### VOR Monitoring Extension 
 This Chrome extension helps automate the process of capturing attendance from Google Meet breakout rooms and logging the data to a connected Google Spreadsheet using Google Apps Script.
 
-🚀 Features
+### 🚀 Features
 
 Capture participant metadata like timestamp, name, camera status, and breakout room name
 Log attendance in a structured format to Google Sheets
@@ -9,9 +9,11 @@ Auto-create sheets based on date and breakout room
 Optional time restriction-based screenshot scheduling
 
 
-🛠️ Setup Instructions
+### 🛠️ Setup Instructions
 1. Clone the Repository
+```bash
 git clone https://github.com/saiprabhu-dandanayak/VOR_Monitoring.git
+```
 
 2. Setup Google Apps Script
 
@@ -20,8 +22,7 @@ Create a new project.
 Replace the default content with the following script:
 
 
-Click to Expand Apps Script Code
-
+```bash
 function doPost(e) {
   try {
     console.log('--- Received POST Request ---');
@@ -154,10 +155,9 @@ function doPost(e) {
            .setMimeType(ContentService.MimeType.TEXT);
   }
 }
+```
 
-
-
-3. Deploy as Web App
+### 3. Deploy as Web App
 
 Click Deploy > Manage deployments.
 Click + New Deployment.
@@ -170,14 +170,14 @@ Who has access: Anyone (or Anyone within Zemoso)
 
 Click Deploy and copy the Web App URL.
 
-4. Update the Extension with Script URL
+### 4. Update the Extension with Script URL
 
 Open background.js in the cloned repo.
 Replace the scriptURL in updateCSV with your deployed Apps Script URL:
 
 const scriptURL = '<YOUR_SCRIPT_URL_HERE>';
 
-5. Load the Extension in Chrome
+### 5. Load the Extension in Chrome
 
 Open chrome://extensions/.
 Enable Developer Mode.
@@ -185,7 +185,7 @@ Click Load unpacked.
 Select the folder you cloned.
 Pin the extension from the extensions toolbar.
 
-6. Use the Extension
+### 6. Use the Extension
 
 Click the extension icon.
 Paste your Google Meet link in the Meet URL field.
@@ -194,16 +194,10 @@ Click Save Schedule.
 Click Capture Now to send data.
 
 
-🧪 Google Sheets Format
+### 🧪 Google Sheets Format
 For each breakout session and date, a sheet is created named:
 DD/MM/YYYY_BreakoutRoomName
 
 Each sheet has the following columns:
 Timestamp    Name    Camera_Status    Breakout_Room
 
-
-🧾 License
-MIT
-
-🤝 Contributing
-Pull requests are welcome. For major changes, please open an issue first.
