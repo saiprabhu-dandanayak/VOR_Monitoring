@@ -160,7 +160,7 @@ async function saveImage(dataUrl) {
     formData.append("file", blob, `screenshot_${timeStr}.png`);
 
     console.log("📤 Sending to FastAPI...");
-    const response = await fetch("http://127.0.0.1:8000/analyze-screenshot", {
+    const response = await fetch("http://vor-monitoring.z-apps.io/analyze-screenshot", {
       method: "POST",
       body: formData
     });
