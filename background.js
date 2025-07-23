@@ -1,476 +1,223 @@
-let keepAliveInterval;
+// Initialize default settings
+chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'], function(result) {
+  const defaults = {};
 
-function startKeepAlive() {
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
+  if (result.meetUrl === undefined) defaults.meetUrl = '';
+  if (result.timeRestriction === undefined) defaults.timeRestriction = false;
+  if (result.startTime === undefined) defaults.startTime = '13:00';
+  if (result.endTime === undefined) defaults.endTime = '15:00';
+
+  if (Object.keys(defaults).length > 0) {
+    chrome.storage.local.set(defaults);
   }
-  
-  keepAliveInterval = setInterval(() => {
-    chrome.runtime.getPlatformInfo(() => {
+});
 
-      if (chrome.runtime.lastError) {
-        console.log('Keep-alive ping failed:', chrome.runtime.lastError);
-      }
-    });
-  }, 25000);
-}
+// Create alarm for periodic screenshots
+chrome.alarms.create("takeScreenshot", { periodInMinutes: 15 });
 
-
-async function initializeExtension() {
-  console.log("🚀 Extension initializing...");
-  
-  try {
-
-    await chrome.alarms.clearAll();
-    await initializeSettings();
-    chrome.alarms.create("takeScreenshot", { periodInMinutes: 1 });
-  
-    startKeepAlive();
-    console.log("✅ Extension initialized successfully");
-  } catch (error) {
-    console.error("❌ Extension initialization failed:", error);
-    setTimeout(initializeExtension, 30000);
-  }
-}
-
-
-async function initializeSettings() {
-  return new Promise((resolve, reject) => {
-    chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'], function(result) {
-      if (chrome.runtime.lastError) {
-        console.error("Storage read error:", chrome.runtime.lastError);
-        reject(chrome.runtime.lastError);
-        return;
-      }
-      
-      const defaults = {};
-      
-      if (!result.meetUrl) {
-        defaults.meetUrl = '';
-      }
-      
-      if (result.timeRestriction === undefined) {
-        defaults.timeRestriction = false;
-      }
-      
-      if (!result.startTime) {
-        defaults.startTime = '13:00'; 
-      }
-      
-      if (!result.endTime) {
-        defaults.endTime = '15:00'; 
-      }
-      
-      if (Object.keys(defaults).length > 0) {
-        chrome.storage.local.set(defaults, function() {
-          if (chrome.runtime.lastError) {
-            console.error("Storage write error:", chrome.runtime.lastError);
-            reject(chrome.runtime.lastError);
-          } else {
-            console.log("Default settings applied:", defaults);
-            resolve();
-          }
-        });
-      } else {
-        resolve();
-      }
-    });
-  });
-}
-
-
+// Handle alarm events
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === "takeScreenshot") {
-    try {
-      const isRestricted = await isTimeRestricted();
-      const now = new Date();
-      const currentHour = now.getHours();
-      const isAfterHardStopTime = currentHour >= 18;
-      
-      if (!isRestricted && !isAfterHardStopTime) {
-        console.log("Taking scheduled screenshot");
-        await takeScreenshot();
-      } else {
-        let reasons = [];
-        if (isRestricted) {
-          reasons.push("user-defined time restrictions");
-        }
-        if (isAfterHardStopTime) {
-          reasons.push("it's 6 PM or later (hard stop)");
-        }
-        console.log(`Screenshot skipped due to: ${reasons.join(' and ')}.`);
-      }
-    } catch (error) {
-      console.error("Error in alarm handler:", error);
+    const isRestricted = await isTimeRestricted();
+    const currentHour = new Date().getHours();
+    const isAfterHardStopTime = currentHour >= 18;
 
-      if (!await chrome.alarms.get("takeScreenshot")) {
-        console.log("Recreating missing alarm...");
-        chrome.alarms.create("takeScreenshot", { periodInMinutes: 1 });
-      }
+    if (!isRestricted && !isAfterHardStopTime) {
+      console.log("✅ Taking scheduled screenshot");
+      await takeScreenshot();
+    } else {
+      const reasons = [];
+      if (isRestricted) reasons.push("user-defined time restrictions");
+      if (isAfterHardStopTime) reasons.push("it's 6 PM or later (hard stop)");
+      console.log(`⏭ Screenshot skipped due to: ${reasons.join(' and ')}.`);
     }
   }
 });
 
-
+// Check if current time is within restricted period
 async function isTimeRestricted() {
-  try {
-    const result = await new Promise((resolve, reject) => {
-      chrome.storage.local.get(['timeRestriction', 'startTime', 'endTime'], function(result) {
-        if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else {
-          resolve(result);
-        }
-      });
-    });
-    
-    if (!result.timeRestriction) {
-      console.log("Time restrictions are disabled");
-      return false;
-    }
-    
-    const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentTimeStr = `${currentHour.toString().padStart(2, '0')}:${currentMinute.toString().padStart(2, '0')}`;
-    
-    const startTime = result.startTime || '13:00';
-    const endTime = result.endTime || '15:00';
-    
-    console.log(`Current time: ${currentTimeStr}, Restriction period: ${startTime} - ${endTime}`);
-    
-    if (startTime < endTime) {
-      const isRestricted = currentTimeStr >= startTime && currentTimeStr < endTime;
-      console.log(`Normal time range: ${isRestricted ? "RESTRICTED" : "NOT RESTRICTED"}`);
-      return isRestricted;
-    } else {
-      const isRestricted = currentTimeStr >= startTime || currentTimeStr < endTime;
-      console.log(`Overnight time range: ${isRestricted ? "RESTRICTED" : "NOT RESTRICTED"}`);
-      return isRestricted;
-    }
-  } catch (error) {
-    console.error("Error checking time restrictions:", error);
+  const { timeRestriction, startTime, endTime } = await chrome.storage.local.get(['timeRestriction', 'startTime', 'endTime']);
+
+  if (!timeRestriction) {
+    console.log("Time restrictions are disabled");
     return false;
   }
+
+  const now = new Date();
+  const currentTimeStr = now.toTimeString().slice(0, 5); // "HH:MM"
+
+  console.log(`Current time: ${currentTimeStr}, Restriction: ${startTime} - ${endTime}`);
+
+  if (startTime < endTime) {
+    return currentTimeStr >= startTime && currentTimeStr < endTime;
+  } else {
+    return currentTimeStr >= startTime || currentTimeStr < endTime;
+  }
 }
 
-
+// Handle messages from popup or content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  try {
-    if (message.action === "updateMeetUrl") {
-      chrome.storage.local.set({ meetUrl: message.url }, function() {
-        if (chrome.runtime.lastError) {
-          console.error("Error updating Meet URL:", chrome.runtime.lastError);
-          sendResponse({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          console.log("Updated Meet URL to:", message.url);
-          sendResponse({ success: true });
-        }
-      });
-      return true;
-    } 
-    
-    else if (message.action === "takeScreenshotNow") {
-      console.log("Manual screenshot requested");
-      takeScreenshot()
-        .then(() => sendResponse({ success: true }))
-        .catch(error => {
-          console.error("Manual screenshot failed:", error);
-          sendResponse({ success: false, error: error.message });
-        });
-      return true; 
-    } 
-    
-    else if (message.action === "getMeetUrl") {
-      chrome.storage.local.get(['meetUrl'], function(result) {
-        if (chrome.runtime.lastError) {
-          sendResponse({ error: chrome.runtime.lastError.message });
-        } else {
-          sendResponse({ url: result.meetUrl });
-        }
-      });
-      return true; 
-    } 
-    
-    else if (message.action === "testTimeRestriction") {
-      isTimeRestricted()
-        .then(isRestricted => sendResponse({ isRestricted: isRestricted }))
-        .catch(error => sendResponse({ error: error.message }));
-      return true; 
-    }
-    
-    else if (message.action === "ping") {
-
-      sendResponse({ status: "alive", timestamp: Date.now() });
-    }
-  } catch (error) {
-    console.error("Error in message handler:", error);
-    sendResponse({ success: false, error: error.message });
+  if (message.action === "updateMeetUrl") {
+    chrome.storage.local.set({ meetUrl: message.url });
+    console.log("Updated Meet URL to:", message.url);
+    sendResponse({ success: true });
+  } else if (message.action === "takeScreenshotNow") {
+    console.log("Manual screenshot requested");
+    takeScreenshot();
+    sendResponse({ success: true });
+  } else if (message.action === "getMeetUrl") {
+    chrome.storage.local.get(['meetUrl'], result => {
+      sendResponse({ url: result.meetUrl });
+    });
+  } else if (message.action === "testTimeRestriction") {
+    isTimeRestricted().then(isRestricted => {
+      sendResponse({ isRestricted });
+    });
   }
+  return true;
 });
 
-
+// Find the specific Google Meet tab
 async function findMeetTab() {
-  try {
-    const result = await new Promise((resolve, reject) => {
-      chrome.storage.local.get(['meetUrl'], function(result) {
-        if (chrome.runtime.lastError) {
-          console.error("Storage error while fetching Meet URL:", chrome.runtime.lastError);
-          resolve(null);
-        } else {
-          resolve(result);
-        }
-      });
-    });
-
-    const meetUrl = result?.meetUrl;
-    if (!meetUrl) {
-      console.warn("No Meet URL configured");
-      return null;
-    }
-
-    const match = meetUrl.match(/meet\.google\.com\/([a-zA-Z0-9\-]+)/);
-    const meetingCode = match ? match[1] : null;
-
-    if (!meetingCode) {
-      console.warn("Could not extract meeting code from URL");
-      return null;
-    }
-
-    const meetTabs = await chrome.tabs.query({ url: "*://meet.google.com/*" });
-    const matchingTab = meetTabs.find(tab => tab.url.includes(meetingCode));
-
-    if (matchingTab) {
-      console.log("Found Google Meet tab (by meeting code):", matchingTab.url);
-      return matchingTab;
-    }
-
-    console.warn("No Google Meet tab open for configured meeting code");
-    return null;
-  } catch (error) {
-    console.error("Unexpected error in findMeetTab:", error);
-    return null;
+  const { meetUrl } = await chrome.storage.local.get(['meetUrl']);
+  if (meetUrl) {
+    const tabs = await chrome.tabs.query({ url: meetUrl });
+    if (tabs.length > 0) return tabs[0];
   }
+  throw new Error("No matching Google Meet tab found.");
 }
 
+// Take a screenshot
 async function takeScreenshot() {
   let currentActiveTab = null;
-  let processingLock = false;
 
   try {
     const { isProcessing } = await chrome.storage.local.get(['isProcessing']);
     if (isProcessing) {
-      console.log("Screenshot already in progress, skipping.");
+      console.log("Screenshot already in progress.");
       return;
     }
 
     await chrome.storage.local.set({ isProcessing: true });
-    processingLock = true;
-
 
     const meetTab = await findMeetTab();
 
-    if (!meetTab || !meetTab.windowId) {
-      console.warn("No active Google Meet tab found for configured meeting. Skipping screenshot.");
-      return;
-    }
+    if (!meetTab || !meetTab.windowId) throw new Error("No valid Meet tab");
 
-    const activeTabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (activeTabs.length > 0) {
-      currentActiveTab = activeTabs[0];
-    }
-
+    [currentActiveTab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
     await chrome.windows.update(meetTab.windowId, { focused: true });
     await chrome.tabs.update(meetTab.id, { active: true });
-    await new Promise(resolve => setTimeout(resolve, 1000)); 
 
-    const dataUrl = await new Promise((resolve) => {
-      chrome.tabs.captureVisibleTab(meetTab.windowId, { format: "png" }, (dataUrl) => {
-        if (chrome.runtime.lastError || !dataUrl) {
-          console.error("Capture failed:", chrome.runtime.lastError);
-          resolve(null);
-        } else {
-          resolve(dataUrl);
-        }
-      });
-    });
+    await new Promise(res => setTimeout(res, 1000)); // Wait for tab to activate
 
-    if (!dataUrl) {
-      console.warn("No screenshot captured. Skipping save.");
-      return;
-    }
-
-    console.log("Screenshot captured successfully.");
-    await saveImage(dataUrl);
-
-  } catch (error) {
-    console.error("Error in takeScreenshot:", error);
-  } finally {
-    if (processingLock) {
-      await chrome.storage.local.set({ isProcessing: false });
-    }
-
-    if (currentActiveTab) {
-      try {
-        await chrome.tabs.update(currentActiveTab.id, { active: true });
-      } catch (restoreError) {
-        console.error("Failed to restore active tab:", restoreError);
+    chrome.tabs.captureVisibleTab(meetTab.windowId, { format: "png" }, async (dataUrl) => {
+      if (chrome.runtime.lastError) {
+        console.error("Capture error:", chrome.runtime.lastError.message);
+        await chrome.storage.local.set({ isProcessing: false });
+        return;
       }
-    }
+
+      console.log("📸 Screenshot captured");
+      try {
+        await saveImage(dataUrl);
+      } catch (err) {
+        console.error("Save error:", err);
+      } finally {
+        await chrome.storage.local.set({ isProcessing: false });
+        if (currentActiveTab) await chrome.tabs.update(currentActiveTab.id, { active: true });
+      }
+    });
+  } catch (err) {
+    console.error("Screenshot error:", err);
+    await chrome.storage.local.set({ isProcessing: false });
   }
 }
 
-
-
+// Save and send screenshot
 async function saveImage(dataUrl) {
   const subfolder = "GoogleMeetScreenshots";
   const now = new Date();
 
-  const dateOptions = {
-    timeZone: 'Asia/Kolkata',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric'
-  };
-  const dateStr = now.toLocaleString('en-IN', dateOptions).split('/').join('-'); 
+  const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
+  const timeStr = now.toLocaleTimeString('en-IN', { hour12: false }).replace(/:/g, '-');
 
-  const timeOptions = {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false 
-  };
-  const timeStr = now.toLocaleString('en-IN', timeOptions).replace(/:/g, '-'); 
+  const imageFilename = `${subfolder}/${dateStr}/meet_screenshot_${timeStr}.png`;
 
-  const imageFilename = `${subfolder}/${dateStr}/meet_screenshot_${timeStr}.png`; 
-
-
-  try {
-    await new Promise((resolve, reject) => {
-      chrome.downloads.download({
-        url: dataUrl,
-        filename: imageFilename,
-        saveAs: false
-      }, (downloadId) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else {
-          console.log(`✅ Screenshot saved as ${imageFilename}`);
-          resolve(downloadId);
-        }
-      });
-    });
-  } catch (error) {
-    console.error("❌ Screenshot download error:", error);
-  }
-
-
-  const maxRetries = 3;
-  let retryCount = 0;
-  
-  while (retryCount < maxRetries) {
-    try {
-      const response = await fetch(dataUrl);
-      const blob = await response.blob();
-      const formData = new FormData();
-      formData.append("file", blob, `screenshot_${timeStr}.png`);
-
-      console.log(`Sending screenshot to FastAPI endpoint... (attempt ${retryCount + 1})`);
-      
-      const apiResponse = await fetch("http://vor-monitoring.z-apps.io/analyze-screenshot", {
-        method: "POST",
-        body: formData,
-        signal: AbortSignal.timeout(30000) 
-      });
-
-      if (!apiResponse.ok) {
-        throw new Error(`API request failed with status ${apiResponse.status}: ${apiResponse.statusText}`);
-      }
-
-      const data = await apiResponse.json();
-      console.log("Received data from FastAPI:", data);
-
-      const formattedTimestamp = `${dateStr} ${timeStr.replace(/-/g, ':')}`;
-      await updateCsv(data, formattedTimestamp);
-      
-      break; 
-      
-    } catch (error) {
-      retryCount++;
-      console.error(`❌ Error sending screenshot to FastAPI (attempt ${retryCount}):`, error);
-      
-      if (retryCount < maxRetries) {
-        console.log(`Retrying in ${retryCount * 5} seconds...`);
-        await new Promise(resolve => setTimeout(resolve, retryCount * 5000));
-      } else {
-        console.log("Max retries reached. Skipping CSV update.");
-      }
+  // Download image
+  chrome.downloads.download({ url: dataUrl, filename: imageFilename, saveAs: false }, (downloadId) => {
+    if (chrome.runtime.lastError) {
+      console.error("Download error:", chrome.runtime.lastError);
+    } else {
+      console.log(`💾 Screenshot saved as ${imageFilename}`);
     }
+  });
+
+  // Send to FastAPI
+  try {
+    const blob = await (await fetch(dataUrl)).blob();
+    const formData = new FormData();
+    formData.append("file", blob, `screenshot_${timeStr}.png`);
+
+    console.log("📤 Sending to FastAPI...");
+    const response = await fetch("http://127.0.0.1:8000/analyze-screenshot", {
+      method: "POST",
+      body: formData
+    });
+
+    if (!response.ok) throw new Error(`FastAPI error: ${response.status}`);
+
+    const result = await response.json();
+    console.log("✅ FastAPI response:", result);
+
+    const formattedTimestamp = `${dateStr} ${timeStr.replace(/-/g, ':')}`;
+    await updateCsv(result, formattedTimestamp);
+  } catch (err) {
+    console.error("❌ FastAPI send error:", err);
   }
 }
 
-
+// Send data to Google Sheet
 async function updateCsv(data, formattedTimestamp) {
-  const scriptUrl = 'https://script.google.com/a/macros/zemosolabs.com/s/AKfycbz3eHEYjoOx6bEJdZVyW47ROVYsh4OQlVb_c2Kme2LesZYyjlyqjnNsPiM9C1qDdmf3/exec';  
+  const scriptUrl = 'https://script.google.com/a/macros/zemosolabs.com/s/AKfycbzgH7TVDE5gtzlT2tN3g8-2iIsolHpJm4AqrcDW1-zvc1bSFtj9WLbvTubP4r6P45VzGA/exec';
+
+  const breakoutRoom = data.breakout_room || "Unknown";
+  const participants = data.participants || [];
+
+  const payload = participants.map(p => ({
+    timestamp: formattedTimestamp,
+    name: p.name,
+    camera_status: p.camera_status,
+    breakout_room: breakoutRoom
+  }));
 
   try {
-    const breakoutRoom = data.breakout_room || "Unknown"; 
-    const participantData = data.participants || []; 
-
-    if (!Array.isArray(participantData) || participantData.length === 0) {
-      console.log("No participant data to send to Google Sheets");
-      return;
-    }
-
-    const dataToSend = participantData.map(participant => ({
-      timestamp: formattedTimestamp,
-      name: participant.name || "Unknown",
-      camera_status: participant.camera_status || "Unknown",
-      breakout_room: breakoutRoom
-    }));
-    
     const response = await fetch(scriptUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(dataToSend),
-      credentials: 'include',
-      signal: AbortSignal.timeout(15000) 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      credentials: 'include'
     });
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    console.log('Data sent successfully to Google Sheets');
-  } catch (error) {
-    console.error('Error sending data to Google Sheets:', error);
-    throw error;
+
+    if (!response.ok) throw new Error(`Sheet update failed: ${response.status}`);
+    console.log("📝 Data successfully added to Google Sheets");
+  } catch (err) {
+    console.error("❌ Google Sheets update error:", err);
   }
 }
 
+// Initialize on install
+chrome.runtime.onInstalled.addListener(() => {
+  console.log("🚀 Extension installed/updated");
+  chrome.storage.local.get(['meetUrl', 'timeRestriction', 'startTime', 'endTime'], (result) => {
+    const defaults = {};
+    if (result.meetUrl === undefined) defaults.meetUrl = '';
+    if (result.timeRestriction === undefined) defaults.timeRestriction = false;
+    if (result.startTime === undefined) defaults.startTime = '13:00';
+    if (result.endTime === undefined) defaults.endTime = '15:00';
 
-chrome.runtime.onInstalled.addListener(async (details) => {
-  console.log("🚀 Extension installed/updated.", details);
-  await initializeExtension();
+    if (Object.keys(defaults).length > 0) {
+      chrome.storage.local.set(defaults, () => console.log("Default settings applied"));
+    }
+  });
 });
-
-
-chrome.runtime.onStartup.addListener(async () => {
-  console.log("🔄 Extension starting up...");
-  await initializeExtension();
-});
-
-
-chrome.runtime.onSuspend.addListener(() => {
-  console.log("⏸️ Extension suspending...");
-  if (keepAliveInterval) {
-    clearInterval(keepAliveInterval);
-  }
-});
-
-
-initializeExtension();
